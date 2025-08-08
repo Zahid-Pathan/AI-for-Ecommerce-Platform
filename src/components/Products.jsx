@@ -13,13 +13,19 @@ import { parseQuery, applyFilters } from "../ai/nlp";
 
 const Products = () => {
   const [data, setData] = useState([]);
-  const [categoryFiltered, setCategoryFiltered] = useState([]); // was `filter`
+  const [categoryFiltered, setCategoryFiltered] = useState([]); // list after category buttons
   const [loading, setLoading] = useState(false);
 
-  // NLP search state
-  const [q, setQ] = useState("");
-  const parsed = useMemo(() => parseQuery(q), [q]);
-  const visible = useMemo(() => applyFilters(categoryFiltered, parsed), [categoryFiltered, parsed]);
+  // 🔹 Search: draft vs applied
+  const [qDraft, setQDraft] = useState("");
+  const [qApplied, setQApplied] = useState(""); // only this affects results
+
+  // parse only the applied query
+  const parsed = useMemo(() => parseQuery(qApplied), [qApplied]);
+  const visible = useMemo(
+    () => applyFilters(categoryFiltered, parsed),
+    [categoryFiltered, parsed]
+  );
 
   const dispatch = useDispatch();
   const addProduct = (product) => dispatch(addCart(product));
@@ -28,8 +34,8 @@ const Products = () => {
     let isMounted = true;
     const getProducts = async () => {
       setLoading(true);
-      const response = await fetch("https://fakestoreapi.com/products/");
-      const all = await response.json();
+      const res = await fetch("https://fakestoreapi.com/products/");
+      const all = await res.json();
       if (isMounted) {
         setData(all);
         setCategoryFiltered(all);
@@ -56,8 +62,19 @@ const Products = () => {
   );
 
   const filterProduct = (cat) => {
-    const updatedList = data.filter((item) => item.category === cat);
-    setCategoryFiltered(updatedList);
+    const updated = data.filter((item) => item.category === cat);
+    setCategoryFiltered(updated);
+  };
+
+  // 🔹 Submit handler for Search button / Enter key
+  const onSearchSubmit = (e) => {
+    e.preventDefault();
+    setQApplied(qDraft.trim());
+  };
+
+  const onClear = () => {
+    setQDraft("");
+    setQApplied("");
   };
 
   return (
@@ -70,28 +87,46 @@ const Products = () => {
           </div>
         </div>
 
-        {/* 🔹 NLP Search lives OUTSIDE the dynamic grid to avoid remount */}
+        {/* 🔹 Search form with button (doesn't remount on typing) */}
         <div className="row mb-3">
           <div className="col-12">
-            <input
-              className="form-control"
-              placeholder='Try: "running shoes under $100 with good reviews"'
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            {q && (
+            <form className="d-flex gap-2" onSubmit={onSearchSubmit}>
+              <input
+                className="form-control"
+                placeholder='Try: "women cotton under $50 with good reviews"'
+                value={qDraft}
+                onChange={(e) => setQDraft(e.target.value)}
+              />
+              <button type="submit" className="btn btn-dark">
+                Search
+              </button>
+              <button type="button" className="btn btn-outline-secondary" onClick={onClear}>
+                Clear
+              </button>
+            </form>
+
+            {/* parsed chips show the APPLIED query */}
+            {qApplied && (
               <div className="mt-2" style={{ fontSize: 12, color: "#555" }}>
                 {parsed.category && (
-                  <span className="badge bg-light text-dark me-2">Category: {parsed.category}</span>
+                  <span className="badge bg-light text-dark me-2">
+                    Category: {parsed.category}
+                  </span>
                 )}
                 {parsed.minPrice != null && (
-                  <span className="badge bg-light text-dark me-2">Min: ${parsed.minPrice}</span>
+                  <span className="badge bg-light text-dark me-2">
+                    Min: ${parsed.minPrice}
+                  </span>
                 )}
                 {parsed.maxPrice != null && (
-                  <span className="badge bg-light text-dark me-2">Max: ${parsed.maxPrice}</span>
+                  <span className="badge bg-light text-dark me-2">
+                    Max: ${parsed.maxPrice}
+                  </span>
                 )}
                 {parsed.minRating != null && (
-                  <span className="badge bg-light text-dark me-2">Rating ≥ {parsed.minRating}</span>
+                  <span className="badge bg-light text-dark me-2">
+                    Rating ≥ {parsed.minRating}
+                  </span>
                 )}
               </div>
             )}
@@ -136,6 +171,7 @@ const Products = () => {
           </div>
         </div>
 
+        {/* Results */}
         <div className="row justify-content-center">
           {loading ? (
             <Loading />
@@ -183,7 +219,7 @@ const Products = () => {
             ))
           ) : (
             <div className="text-muted text-center py-4">
-              No matches — try another query or clear filters.
+              No matches — click **Clear** or try a different query.
             </div>
           )}
         </div>
